@@ -1,6 +1,6 @@
 과제 01
 ---
-## 문제 배경
+### 문제 배경
 - 쉘 프로그램 mash( My Awesome SHell)은 프롬프트로 "$"를 인쇄한 후 명령줄 입력을 기다린다.
   명령줄을 입력하면 프레임워크는 parse_command()함수를 사용하여 명령줄을 토큰화하고 프레임워크는 run_command()토큰을 사용하여 함수를 호출한다. run_command()에서 시작하여 다음 기능을 구현해야 한다.
 - 현재 쉘은 사용자가 입력할 때까지 계속해서 입력 명령을 받고 처리합니다 exit. 이 경우 쉘 프로그램이 종료된다.
@@ -33,34 +33,37 @@
 3. 명령 기록 유지 : 명령 내역을 유지하는 기능
    - 사용자가 history를 프롬프트에 입력하면 다음 형식으로 명령 내역을 인쇄합니다. 쉘이 이 명령을 자체적으로 처리해야 하므로 이는 history 내장 명령이 됩니다.
      `fprintf(stderr, "%2d: %s", index, command);`
+     > struct list_head history 사용
    - 사용자가 !를 사용하여 기록에서 n번째 명령을 실행할 수 있도록 허용합니다 `! <number>`
 
      ```c
+      extern struct list_head history;
+     
       int run_command(int nr_tokens, char * const tokens[]){
           if(strcmp(tokens[0],"history") == 0){
 		        struct entry* p = NULL;
 		        int index = 0;
 
-		        list_for_each_entry_reverse(p,&history,list){
+		        list_for_each_entry_reverse(p,&history,list){ // history를 역순으로 출력(예전명령을 순서대로)
 			        fprintf(stderr,"%2d: %s",index,p->command);
 			        index += 1;
 		        }
 
-	        }else if(strcmp(tokens[0],"!") == 0){
+	    }else if(strcmp(tokens[0],"!") == 0){
 		        struct entry* p = NULL;
 		        int index = 0;
-		        char find_command[MAX_COMMAND_LEN];
+		        char find_command[MAX_COMMAND_LEN]; // ! number에서 number번째 명령어 저장
 		        int token = atoi(tokens[1]);
 		        list_for_each_entry_reverse(p,&history,list){
 			        if(index == token)break;
 			        index++;
 		        }
-		        strcpy(find_command,p->command);
+		        strcpy(find_command,p->command); // p->command 를 find_command로 복사
 
 		        char * new_tokens[MAX_NR_TOKENS]={NULL};
 		        int num = 0;
-		        if(parse_command(find_command,&num,new_tokens)==0)return -1;
-		        run_command(num,new_tokens);
+		        if(parse_command(find_command,&num,new_tokens)==0)return -1; // 찾은 명령어를 토큰으로 분할하고 분할되지 않으면 종료
+		        run_command(num,new_tokens); // 분할된 토큰을 실행
            }
 
        }
