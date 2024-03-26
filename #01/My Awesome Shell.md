@@ -6,11 +6,8 @@
 - 현재 쉘은 사용자가 입력할 때까지 계속해서 입력 명령을 받고 처리합니다 exit. 이 경우 쉘 프로그램이 종료된다.
 ---
 
-1. 외부 명령 실행 : 쉘이 명령을 받으면 위에 배경에서 설명한 대로 실행 파일을 실행해야 한다.
-     - 외부 실행파일을 실행. ( 예 : ls, pwd, cp )
-     - 어떤 이유로 지정된 실행 파일을 실행할 수 없는 경우 stderr 인쇄.
        
-2. 작업 디렉토리 변경
+1. 작업 디렉토리 변경
      - cd : 쉘에서 기능이 구현되는 내장 명령 구현
        각 사용자는 자신의 홈 디렉토리 ~를 갖습니다. 실제 경로는 $HOME환경 변수에 정의되어 있습니다.
        > 힌트:chdir(), getenv("HOME")
@@ -32,13 +29,13 @@
 
        }
        ```
-	* cd 와 cd ~ 는 HOME 디렉토리로 이동하는 명령어이다.
- 	* chdir() : 작업 디렉토리 변경하는 함수
-  	* getenv() : 환경 변수 목록을 검색하는 함수
+       * cd 와 cd ~ 는 HOME 디렉토리로 이동하는 명령어이다.
+       * chdir() : 작업 디렉토리 변경하는 함수
+       * getenv() : 환경 변수 목록을 검색하는 함수
 
      
         
-3. 명령 기록 유지 : 명령 내역을 유지하는 기능
+2. 명령 기록 유지 : 명령 내역을 유지하는 기능
    - 사용자가 history를 프롬프트에 입력하면 다음 형식으로 명령 내역을 출력합니다. 쉘이 이 명령을 자체적으로 처리해야 하므로 이는 history 내장 명령이 됩니다.
      `fprintf(stderr, "%2d: %s", index, command);`
      > struct list_head history 사용
@@ -83,17 +80,17 @@
 
      
      
-4. 시간 초과된 프로그램 종료
+3. 시간 초과된 프로그램 종료
    - timeout 명령 : 원하는 timeout를 초 단위로 설정하거나 현재 timeout 값을 출력
    - toy 테스트 : @N로 실행하면 몇 초 동안 잠자기 상태 `./toy zzz @N`
-   > 힌트: sigaction(), alarm(), 및 kill()
-   > Use sigaction over signal for code portability (Use sigaction() instead of signal()).
+     	> 힌트: sigaction(), alarm(), 및 kill()  
+      	> Use sigaction over signal for code portability (Use sigaction() instead of signal()).
 
      	```c
      	void timeout(int a){
      		if(a==SIGALRM){
 			fprintf(stderr,"%s is timed out\n",command);
-			kill(pid,SIGKILL);
+			kill(pid,SIGKILL); // 시간초과 자식 프로세스 kill()
 		}
      	}
      	int time = 0;
@@ -107,37 +104,41 @@
 			}else if(strcmp(tokens[1],"0")==0){
 				fprintf(stderr,"Timeout is disable\n"); // timeout = 0 이면 timeout 비활성화
 			}else{
-				time = atoi(tokens[1]); // 원하는 값으로 timeout 설정
+				time = atoi(tokens[1]); // 원하는 값으로 timeout 설정 (time 값 변경)
 				fprintf(stderr,"Timeout is set to %d seconds\n",time);
 			}
 		}else{
 			pid = fork(); // fork() 함수를 호출하여 현재 프로세스를 복제하여 자식 프로세스를 생성
 
 			switch(pid){
-				case -1:
+				case -1: //fork() 실패
 					fprintf(stderr,"fork error\n");
 					break;
-				case 0:
+				case 0: // 자식 프로세스 실행
 					if(execvp(tokens[0],tokens)<0){
 						fprintf(stderr,"Unable to execute %s\n",tokens[0]);
 						exit(1);
-					}
+					} // execvp() 함수 실패 -> 오류 메시지를 출력하고 자식 프로세스를 종료
 					break;
-				default:
-					alarm(time);
+				default: //부모 프로세스 실행 
+					alarm(time); // 시간제한 설정 (timeout으로 설정한 time초 후 signal 전송 -> SIGALARM 호출)
 					waitpid(pid,&status,0);
 					break;	
 			}	
-			alarm(0);
+			alarm(0); // 알람 해제
 		}
     	 }
+   
      	```
-     	* timeout 설정 : 원하는 값으로 timeout 설정하거나 현재 timeout 값 확인
+      	* timeout 설정 : 원하는 값으로 timeout 설정하거나 현재 timeout 값 확인
      	* toy 테스트에서 잠자기 설정
-   		- pid == -1 : 자식 프로세스 생성에 실패, 오류 메세지 출력
-   			- 참고) stderr(표준 오류 출력 스트림)
+     	 	* pid == -1 : 자식 프로세스 생성에 실패, 오류 메세지 출력
+   			* 참고 ) stderr(표준 오류 출력 스트림)
    				= 표준 오류 출력 스트림이 표준 출력 스트림과는 별도로 버퍼링되지 않으므로 오류 메시지가 즉시 출력되어 사용자에게 더 빠르게 피드백을 제공
-   		- 
+   		* pid == 0 : 자식 프로세스가 실행하는 부분, execvp() 함수를 호출하여 외부 명령을 실행
+       			* 참고 ) PATH에 등록된 디렉토리에 있는 프로그램을 실행
+       		* pid > 0 : 부모 프로세스가 실행하는 부분, 자식 프로세스가 완료될때 까지 기다리다가 waitpid로 자식 프로세스 PID 반환
+         		time out으로 시간제한을 설정했다면 그 time 초 만큼 기다리다가 SIGALARM 호출
    
 
 
